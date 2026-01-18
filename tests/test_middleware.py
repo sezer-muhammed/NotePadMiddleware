@@ -6,12 +6,11 @@ from langchain_middleware_notepad.middleware import NotePadMiddleware
 def test_middleware_tools_registration():
     mw = NotePadMiddleware()
     tools = mw.tools
-    assert len(tools) == 5
+    assert len(tools) == 4
     tool_names = {t.name for t in tools}
     expected = {
         "notepad_append",
         "notepad_replace",
-        "notepad_is_exist",
         "notepad_read",
         "notepad_clear",
     }
@@ -43,4 +42,24 @@ def test_middleware_prompt_injection():
     assert isinstance(modified_request.system_message, SystemMessage)
     content = modified_request.system_message.content
     assert "You are a helper." in content
-    assert "TRAINING NOTICE: You have access to a 'notepad'" in content
+    assert "NOTEPAD ACCESS" in content
+
+def test_middleware_missing_system_message():
+    mw = NotePadMiddleware()
+    
+    request = ModelRequest(
+        messages=[HumanMessage(content="Hi")],
+        state={},
+        runtime=MagicMock(),
+        tools=[],
+        tool_choice=None,
+        system_message=None,  # Missing system message
+        model="mock_model"
+    )
+    
+    def mock_handler(req):
+        return req
+        
+    modified_request = mw.wrap_model_call(request, mock_handler)
+    assert isinstance(modified_request.system_message, SystemMessage)
+    assert "NOTEPAD ACCESS" in modified_request.system_message.content

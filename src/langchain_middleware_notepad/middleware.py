@@ -7,11 +7,11 @@ from langchain_core.tools import BaseTool
 from langchain_middleware_notepad.tools import (
     notepad_append,
     notepad_clear,
-    notepad_is_exist,
     notepad_read,
     notepad_replace,
 )
 
+from langchain_middleware_notepad.state import NotepadState 
 
 class NotePadMiddleware(AgentMiddleware):
     """
@@ -49,10 +49,16 @@ class NotePadMiddleware(AgentMiddleware):
         return [
             notepad_append,
             notepad_replace,
-            notepad_is_exist,
             notepad_read,
             notepad_clear,
         ]
+
+    @property
+    def state_schema(self) -> type[NotepadState]:
+        """
+        Return the state schema that this middleware requires.
+        """
+        return NotepadState
 
     def wrap_model_call(
         self,
@@ -64,20 +70,20 @@ class NotePadMiddleware(AgentMiddleware):
         """
         # Construct the injection advice
         injection = (
-            "\n\nTRAINING NOTICE: You have access to a 'notepad' (plain-text scratchpad) "
-            "via tools. Use it to store intermediate facts, plans, or observations "
-            "during multi-step tasks. "
-            "\n- Use 'notepad_append' to add new findings."
-            "\n- Use 'notepad_replace' to rewrite the summary."
-            "\n- Use 'notepad_read' to review stored info."
-            "\n- Do NOT store sensitive PII or secrets."
-            "\n- Prefer the notepad over returning huge context in tool outputs."
+            "\n\n## NOTEPAD ACCESS\n"
+            "You have a persistent plain-text scratchpad ('notepad') to store state/memory across turns.\n"
+            "- `notepad_read`: Read current notes.\n"
+            "- `notepad_append`: Add new info (e.g. tool results, plan updates).\n"
+            "- `notepad_replace`: Rewrite the entire note.\n"
+            "Use this to maintain context for long tasks. Avoid secrets."
         )
         
         # We need to smartly append this to the system message.
         # request.system_message is a SystemMessage object.
         # It might be content string or content blocks.
-        if isinstance(request.system_message.content, str):
+        if request.system_message is None:
+             new_content = injection
+        elif isinstance(request.system_message.content, str):
              new_content = request.system_message.content + injection
         else:
              # Assume list of blocks

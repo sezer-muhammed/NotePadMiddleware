@@ -1,26 +1,33 @@
-from typing import TYPE_CHECKING, Literal
-
-from langchain_core.tools import tool
+from pydantic import BaseModel, Field
+from langchain_core.messages import ToolMessage
 from langgraph.types import Command
-
-if TYPE_CHECKING:
-    from langgraph.prebuilt import InjectedToolRuntime
-    from typing_extensions import Annotated
-    
-    ToolRuntime = Annotated[InjectedToolRuntime, "The tool runtime"]
-else:
-    # Runtime mock/placeholder for runtime type checking if langgraph not installed in dev env
-    ToolRuntime = object
+from langchain.tools import tool, ToolRuntime
 
 
-@tool
-def notepad_append(text: str, runtime: ToolRuntime) -> Command:
+class NotepadAppendInput(BaseModel):
+    """Input schema for appending text to the notepad."""
+    text: str = Field(
+        description="The text content to append to the existing notepad. This will be added on a new line."
+    )
+
+
+class NotepadReplaceInput(BaseModel):
+    """Input schema for replacing the entire notepad content."""
+    text: str = Field(
+        description="The new text content that will completely replace the current notepad content."
+    )
+
+
+@tool(args_schema=NotepadAppendInput)
+def notepad_append(
+    text: str, 
+    runtime: ToolRuntime
+) -> Command:
     """
     Append text to the existing note in the notepad.
     
-    Args:
-        text: The text to append.
-        runtime: The tool runtime context.
+    Use this to add new information while preserving existing notes.
+    The new text will be added on a new line after the current content.
     """
     current_note = runtime.state.get("notepad", "")
     if not current_note:
@@ -28,47 +35,46 @@ def notepad_append(text: str, runtime: ToolRuntime) -> Command:
     else:
         new_note = f"{current_note}\n{text}"
     
-    return Command(update={"notepad": new_note})  # type: ignore[arg-type]
+    return Command(
+        update={
+            "notepad": new_note,
+            "messages": [ToolMessage(
+                content="Appended text to notepad.", 
+                tool_call_id=runtime.tool_call_id
+            )]
+        }
+    )
 
 
-@tool
-def notepad_replace(text: str, runtime: ToolRuntime) -> Command:
+@tool(args_schema=NotepadReplaceInput)
+def notepad_replace(
+    text: str, 
+    runtime: ToolRuntime
+) -> Command:
     """
     Replace the entire note in the notepad with new text.
     
-    Args:
-        text: The new text to replace the existing note.
-        runtime: The tool runtime context.
+    Use this to completely rewrite the notepad content, discarding all previous notes.
+    This is useful for reorganizing or condensing information.
     """
-    return Command(update={"notepad": text})  # type: ignore[arg-type]
-
-
-@tool
-def notepad_is_exist(runtime: ToolRuntime) -> Literal["true", "false"]:
-    """
-    Check if the note currently exists and is non-empty.
-    
-    Args:
-        runtime: The tool runtime context.
-        
-    Returns:
-        "true" if the note exists and is not empty, "false" otherwise.
-    """
-    current_note = runtime.state.get("notepad", "")
-    exists = bool(current_note.strip())
-    return "true" if exists else "false"
+    return Command(
+        update={
+            "notepad": text,
+            "messages": [ToolMessage(
+                content="Replaced notepad content.", 
+                tool_call_id=runtime.tool_call_id
+            )]
+        }
+    )
 
 
 @tool
 def notepad_read(runtime: ToolRuntime) -> str:
     """
-    Read the full content of the note.
+    Read the full content of the notepad.
     
-    Args:
-        runtime: The tool runtime context.
-        
-    Returns:
-        The content of the note, or "<empty>" if there is no note.
+    Returns the current notepad content, or "<empty>" if the notepad is empty.
+    Use this to review what information has been saved.
     """
     current_note = runtime.state.get("notepad", "")
     if not current_note:
@@ -79,9 +85,17 @@ def notepad_read(runtime: ToolRuntime) -> str:
 @tool
 def notepad_clear(runtime: ToolRuntime) -> Command:
     """
-    Clear the note, setting it to an empty string.
+    Clear the notepad, removing all content.
     
-    Args:
-        runtime: The tool runtime context.
+    Use this to start fresh or when the notepad information is no longer needed.
+    This action cannot be undone.
     """
-    return Command(update={"notepad": ""})  # type: ignore[arg-type]
+    return Command(
+        update={
+            "notepad": "",
+            "messages": [ToolMessage(
+                content="Cleared notepad.", 
+                tool_call_id=runtime.tool_call_id
+            )]
+        }
+    )
