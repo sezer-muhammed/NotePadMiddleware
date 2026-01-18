@@ -20,6 +20,7 @@ classifiers = [
 dependencies = [
 "langchain>=0.3.0",
 "langgraph",
+"langchain-core"
 ]
 
 [project.optional-dependencies]
