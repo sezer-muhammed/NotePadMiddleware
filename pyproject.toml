@@ -30,10 +30,6 @@ dependencies = [
 Homepage = "https://github.com/izzet-sezer/NotePadMiddleware"
 Repository = "https://github.com/izzet-sezer/NotePadMiddleware"
 Issues = "https://github.com/izzet-sezer/NotePadMiddleware/issues"
-"langchain>=0.3.0",
-"langgraph",
-"langchain_core"
-]
 
 [project.optional-dependencies]
 dev = [
